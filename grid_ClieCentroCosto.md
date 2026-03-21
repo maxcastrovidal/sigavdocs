@@ -1,0 +1,435 @@
+# Análisis del componente `grid_ClieCentroCosto.aspx`
+
+## Descripción general
+
+**Propósito:**  
+Componente de gestión de **Centros de Costo** de clientes. Permite listar, buscar, crear, editar, clonar, visualizar y eliminar centros de costo asociados a clientes.
+
+**Tipo:**  
+Página ASP.NET Web Forms con grilla interactiva (jqGrid) y formulario modal para operaciones CRUD.
+
+**Ubicación:**  
+- Página: `grid_ClieCentroCosto.aspx`
+- Code-behind: `grid_ClieCentroCosto.aspx.cs`
+- Script: `js/Grid_ClieCentroCosto.js`
+- Control de usuario: `ControlUser/Ctrl_ClieCentroCosto.ascx` y `.ascx.cs`
+
+---
+
+## Componentes y dependencias
+
+### 1. Archivos principales
+
+| Archivo | Tipo | Responsabilidad |
+|---------|------|-----------------|
+| `grid_ClieCentroCosto.aspx` | ASPX | Interfaz de usuario con grilla y contenedor del formulario modal |
+| `grid_ClieCentroCosto.aspx.cs` | C# Code-behind | WebMethods para AJAX, lógica de datos |
+| `js/Grid_ClieCentroCosto.js` | JavaScript | Gestión de grilla (jqGrid), formularios modales, eventos |
+| `ControlUser/Ctrl_ClieCentroCosto.ascx` | User Control | Formulario de edición/creación |
+| `ControlUser/Ctrl_ClieCentroCosto.ascx.cs` | C# | Lógica del control de usuario |
+
+### 2. Objetos JavaScript
+
+| Función | Descripción |
+|---------|-------------|
+| `Grilla_ClieCentroCosto()` | Inicializa y renderiza la grilla jqGrid con datos paginados |
+| `Accion_ClieCentroCosto(id, accion, idpadre, usuario)` | Dispatcher de acciones CRUD (0=Nuevo, 1=Editar, 2=Clonar, 3=Eliminar, 4=Ver) |
+| `popform_ClieCentroCosto()` | Abre el formulario modal (definida en `.ascx`) |
+| `Grabar_ClieCentroCosto()` | Envía datos al backend para crear/actualizar |
+| `BuscarDatos_ClieCentroCosto()` | Carga datos de un registro para edición |
+| `DatosValidacion_ClieCentroCosto()` | Valida campos con expresiones regulares |
+| `DDLIdClieCliente()` | Carga dinámicamente el dropdown de clientes |
+| `Caption()` | Construye la barra de herramientas con filtros y botones |
+| `Filtros()` | Genera controles de filtrado dinámicos |
+| `eliminareg()` | Confirmación y eliminación de registros (común) |
+
+### 3. Métodos C# (WebMethods)
+
+| Método | Ubicación | Descripción |
+|--------|-----------|-------------|
+| `Grilla_ClieCentroCosto()` | `grid_ClieCentroCosto.aspx.cs` | Consulta paginada vía `sp_Paginacion_Grilla2` |
+| `Buscar()` | `grid_ClieCentroCosto.aspx.cs` | Busca un registro por ID vía `sp_generico_sel` |
+| `InicializaClieCentroCosto()` | `grid_ClieCentroCosto.aspx.cs` | Carga inicial de datos del usuario |
+| `Grabar()` | `servicios/servicios_sigav.aspx` | Inserta o actualiza registro |
+| `Eliminar()` | `servicios/servicios_sigav.aspx` | Elimina registro (lógica o física) |
+| `CargaDDL()` | `servicios/servicios_sigav.aspx` | Carga opciones del dropdown de clientes |
+| `Caption_Option()` | `servicios/servicios_sigav.aspx` | Genera opciones para filtros dinámicos |
+
+### 4. Procedimientos almacenados (SQL Server)
+
+| Stored Procedure | Propósito |
+|------------------|-----------|
+| `sp_Paginacion_Grilla2` | Consulta paginada y filtrada de centros de costo |
+| `sp_generico_sel` | Selecciona un registro específico por tabla e ID |
+| `sp_InicializaClieCentroCosto` | Carga datos iniciales del usuario (cliente asociado) |
+| `sp_llenaDropDown` | Llena dropdown de clientes |
+| SP de inserción/actualización | Llamado desde `Grabar()` en `servicios_sigav.aspx` |
+| SP de eliminación | Llamado desde `Eliminar()` en `servicios_sigav.aspx` |
+
+---
+
+## Flujo CRUD - Diagramas
+
+### Diagrama de secuencia completo
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant JS as js/Grid_ClieCentroCosto.js
+    participant ASPX as grid_ClieCentroCosto.aspx.cs
+    participant CTRL as Ctrl_ClieCentroCosto.ascx
+    participant SVC as servicios/servicios_sigav.aspx
+    participant DB as SQL Server
+
+    %% CARGA INICIAL
+U->>JS: Abre página grid_ClieCentroCosto.aspx
+    JS->>ASPX: Grilla_ClieCentroCosto() [WebMethod]
+    ASPX->>DB: sp_Paginacion_Grilla2(tabla='ClieCentroCosto', filtros, paginación)
+    DB-->>ASPX: DataSet con registros paginados
+    ASPX-->>JS: JSON (JQGridJsonResponse_ClieCentroCosto)
+    JS-->>U: Renderiza grilla jqGrid con botones
+
+    %% CREAR (INSERT)
+    U->>JS: Click botón "Nuevo"
+JS->>JS: Accion_ClieCentroCosto(0, 0, 0) ? popform_ClieCentroCosto()
+    JS->>CTRL: Abre modal, ejecuta LimpiaDatos_ClieCentroCosto()
+    JS->>SVC: CargaDDL() para IdClieCliente
+  SVC->>DB: sp_llenaDropDown('ClieCliente')
+    DB-->>SVC: Lista de clientes
+    SVC-->>JS: JSON con opciones
+    JS-->>U: Muestra formulario vacío con dropdown cargado
+ 
+    U->>JS: Completa campos y click "Grabar"
+    JS->>JS: DatosValidacion_ClieCentroCosto() (validación cliente)
+    JS->>SVC: Grabar(id=0, tabla='ClieCentroCosto', parametros, accion=0)
+    SVC->>DB: Ejecuta SP de inserción
+    DB-->>SVC: ID del nuevo registro + estado
+    SVC-->>JS: { Id, Name (mensaje) }
+    JS->>JS: Grilla_ClieCentroCosto(1) - Recarga grilla
+ JS-->>U: Cierra modal, muestra mensaje, grilla actualizada
+
+    %% EDITAR (UPDATE)
+    U->>JS: Click botón "Editar" en fila
+    JS->>JS: Accion_ClieCentroCosto(id, 1, id) ? popform_ClieCentroCosto()
+    JS->>CTRL: Abre modal, ejecuta BuscarDatos_ClieCentroCosto()
+    JS->>ASPX: Buscar(id, 'ClieCentroCosto') [WebMethod]
+    ASPX->>DB: sp_generico_sel('ClieCentroCosto', id)
+    DB-->>ASPX: Registro con IdClieCliente, Nombre
+    ASPX-->>JS: JSON con datos del registro
+    JS->>SVC: CargaDDL() + DDLIdClieCliente()
+    SVC->>DB: sp_llenaDropDown
+    DB-->>SVC: Opciones dropdown
+    SVC-->>JS: JSON
+    JS-->>U: Formulario con datos cargados
+ 
+    U->>JS: Modifica campos y click "Grabar"
+    JS->>JS: DatosValidacion_ClieCentroCosto()
+ JS->>SVC: Grabar(id, tabla, parametros, accion=1)
+    SVC->>DB: Ejecuta SP de actualización
+    DB-->>SVC: Estado
+    SVC-->>JS: { Id, Name }
+    JS->>JS: Grilla_ClieCentroCosto(1)
+    JS-->>U: Cierra modal, mensaje, grilla actualizada
+
+    %% CLONAR
+    U->>JS: Click botón "Clonar"
+    JS->>JS: Accion_ClieCentroCosto(id, 2, id) ? popform_ClieCentroCosto()
+    JS->>CTRL: Abre modal con accion=2
+    JS->>ASPX: Buscar(id, 'ClieCentroCosto')
+    ASPX->>DB: sp_generico_sel
+    DB-->>ASPX: Datos originales
+    ASPX-->>JS: JSON
+    JS-->>U: Formulario con datos del registro original (nuevo ID=0)
+    Note over JS,U: Usuario puede modificar antes de grabar
+    U->>JS: Click "Grabar"
+    JS->>SVC: Grabar(id=0, tabla, parametros, accion=0)
+    SVC->>DB: SP inserción
+    DB-->>SVC: Nuevo ID
+    SVC-->>JS: Estado
+  JS-->>U: Mensaje + grilla actualizada
+
+    %% ELIMINAR (DELETE)
+    U->>JS: Click botón "Eliminar"
+    JS->>JS: Accion_ClieCentroCosto(id, 3, id, usuario) ? eliminareg()
+  JS-->>U: Muestra dialog de confirmación
+    U->>JS: Confirma eliminación
+    JS->>SVC: Eliminar(id, 'ClieCentroCosto') [servicios_sigav.aspx]
+    SVC->>DB: Ejecuta SP de eliminación
+    DB-->>SVC: Estado
+ SVC-->>JS: { Id, Name }
+    JS->>JS: Grilla_ClieCentroCosto(1)
+    JS-->>U: Mensaje + grilla actualizada
+
+    %% VER (READ ONLY)
+    U->>JS: Click botón "Ver"
+    JS->>JS: Accion_ClieCentroCosto(id, 4, id)
+    JS->>U: SubFormJquery() abre form_ClieCentroCosto.aspx?id={id}
+    Note over U: Vista de solo lectura en iframe modal
+```
+
+### Diagrama de componentes y dependencias
+
+```mermaid
+graph TB
+    subgraph "Frontend - Cliente"
+        ASPX[grid_ClieCentroCosto.aspx<br/>Master: Site.master]
+        JS[js/Grid_ClieCentroCosto.cs]
+        CTRL_ASCX[Ctrl_ClieCentroCosto.ascx<br/>Formulario modal]
+        JQUERY[jQuery + jqGrid + jQuery UI]
+    end
+
+    subgraph "Backend - Servidor"
+        CS[grid_ClieCentroCosto.aspx.cs<br/>WebMethods]
+        CTRL_CS[Ctrl_ClieCentroCosto.ascx.cs<br/>Lógica control]
+        SVC[servicios/servicios_sigav.aspx<br/>Grabar/Eliminar/CargaDDL]
+        CLASS[ClassGrid.cs<br/>Helpers DB]
+    end
+
+    subgraph "Base de datos"
+        SP1[sp_Paginacion_Grilla2]
+        SP2[sp_generico_sel]
+        SP3[sp_InicializaClieCentroCosto]
+    SP4[sp_llenaDropDown]
+        SP5[SP Inserción/Actualización]
+    SP6[SP Eliminación]
+        TBL[(Tabla: ClieCentroCosto)]
+    end
+
+    ASPX -->|Registra| CTRL_ASCX
+    ASPX -->|Carga| JS
+    JS -->|AJAX WebMethod| CS
+    JS -->|AJAX WebMethod| SVC
+    JS -->|Controla| CTRL_ASCX
+    CTRL_ASCX -->|Ejecuta funciones| JS
+    
+    CS -->|Ejecuta| SP1
+    CS -->|Ejecuta| SP2
+    CS -->|Ejecuta| SP3
+    CS -->|Usa| CLASS
+    
+    CTRL_CS -->|Ejecuta| SP2
+    CTRL_CS -->|Ejecuta| SP4
+    
+    SVC -->|Ejecuta| SP5
+  SVC -->|Ejecuta| SP6
+    SVC -->|Ejecuta| SP4
+    
+    SP1 -->|Lee| TBL
+    SP2 -->|Lee| TBL
+    SP3 -->|Lee| TBL
+    SP5 -->|Escribe| TBL
+    SP6 -->|Escribe/Elimina| TBL
+    
+    JS -.->|Usa| JQUERY
+
+    style ASPX fill:#e1f5ff
+    style JS fill:#fff4e1
+    style CS fill:#e8f5e9
+    style SVC fill:#e8f5e9
+    style TBL fill:#fce4ec
+```
+
+---
+
+## Detalles de implementación CRUD
+
+### **CREATE (Crear)**
+
+**Flujo:**
+1. Usuario hace clic en botón "Nuevo" ? `Accion_ClieCentroCosto(0, 0, 0)`
+2. Se ejecuta `popform_ClieCentroCosto()` (definida en `Ctrl_ClieCentroCosto.ascx`)
+3. Se limpia el formulario con `LimpiaDatos_ClieCentroCosto(accion=0)`
+4. Se carga el dropdown de clientes vía `DDLIdClieCliente()`
+   - Llama a `servicios_sigav.aspx/CargaDDL`
+   - Ejecuta `sp_llenaDropDown` para obtener lista de clientes
+5. Usuario completa los campos:
+   - `IdClieCliente` (dropdown)
+   - `Nombre` (textbox)
+6. Al hacer clic en "Grabar":
+   - `DatosValidacion_ClieCentroCosto()` valida con regex
+   - `Grabar_ClieCentroCosto(id=0, tabla, accion=0, ...)`
+   - AJAX POST a `servicios_sigav.aspx/Grabar` con parámetros
+   - Backend ejecuta SP de inserción
+   - Retorna `{ Id: nuevoId, Name: "mensaje" }`
+7. Se refresca la grilla y cierra el modal
+
+**Validaciones:**
+- `IdClieCliente`: `/^[0-9]{0,10}$/` (numérico, máx 10 dígitos)
+- `Nombre`: `/^[a-zA-Z0-9_.,:ñÑáéíóúÁÉÍÓÚ()=<>°$%@\/\*\+\s\-\\]+$/` (alfanumérico extendido, máx 50 caracteres)
+
+---
+
+### **READ (Leer/Listar)**
+
+**Flujo:**
+1. Al cargar la página, `$(document).ready()` ejecuta `Grilla_ClieCentroCosto()`
+2. jqGrid hace AJAX POST a `grid_ClieCentroCosto.aspx/Grilla_ClieCentroCosto` con:
+   - `pPageSize`: filas por página
+   - `pCurrentPage`: página actual
+   - `pSortColumn`: columna de ordenamiento
+   - `pSortOrder`: orden (asc/desc)
+- `pSearchString`: filtros aplicados
+3. WebMethod `Grilla_ClieCentroCosto` ejecuta `sp_Paginacion_Grilla2`:
+   ```sql
+   sp_Paginacion_Grilla2 
+       @PageSize, @CurrentPage, @SortColumn, @SortOrder, 
+   @tabla='ClieCentroCosto', @filtro, @IdUsuario
+   ```
+4. Retorna 2 tablas:
+   - Tabla 0: `PageCount`, `CurrentPage`, `RecordCount`
+   - Tabla 1: Registros con `IdClieCentroCosto`, `Nombre`, botones HTML
+5. Se construye JSON y se renderiza en la grilla
+6. Cada fila incluye 4 botones: Editar, Clonar, Eliminar, Ver
+
+**Filtros dinámicos:**
+- Hasta 3 filtros simultáneos (columna + valor)
+- Se construyen con `Caption()` y `Filtros()`
+- Formato de filtro: `and NombreColumna like #%valor%#`
+
+---
+
+### **UPDATE (Actualizar)**
+
+**Flujo:**
+1. Usuario hace clic en botón "Editar" ? `Accion_ClieCentroCosto(id, 1, id)`
+2. Se ejecuta `popform_ClieCentroCosto()` con `accion=1`
+3. Se ejecuta `BuscarDatos_ClieCentroCosto(id, 'ClieCentroCosto', accion=1)`
+   - AJAX a `grid_ClieCentroCosto.aspx/Buscar`
+   - WebMethod ejecuta `sp_generico_sel('ClieCentroCosto', id)`
+   - Retorna datos del registro
+4. Se cargan los datos en el formulario:
+   - `$('#IdClieCentroCosto').val(id)` (disabled)
+   - `DDLIdClieCliente()` carga dropdown y selecciona el cliente actual
+   - `$('#Nombre').val(this.ws_Nombre)`
+5. Usuario modifica campos
+6. Al hacer clic en "Grabar":
+   - `DatosValidacion_ClieCentroCosto()` valida
+   - `Grabar_ClieCentroCosto(id, tabla, accion=1, ...)`
+   - AJAX POST a `servicios_sigav.aspx/Grabar` con:
+     - `id_reg`: ID del registro
+     - `par`: parámetros (IdClieCliente, Nombre)
+     - `accion`: 1 (update)
+   - Backend ejecuta SP de actualización
+7. Retorna estado y mensaje
+8. Se refresca la grilla
+
+**Detección de cambios:**
+- `CambiosClieCentroCosto()` registra evento `change` en campos
+- Activa el botón "Grabar" solo si hay modificaciones (`#mod_ClieCentroCosto`)
+
+---
+
+### **DELETE (Eliminar)**
+
+**Flujo:**
+1. Usuario hace clic en botón "Eliminar" ? `Accion_ClieCentroCosto(id, 3, id, usuario)`
+2. Ejecuta `eliminareg(id, 'ClieCentroCosto', '', '', usuario)` (función común)
+3. Muestra dialog de confirmación jQuery UI
+4. Usuario confirma:
+   - AJAX POST a `servicios_sigav.aspx/Eliminar`
+   - Parámetros: `id_reg`, `tabla='ClieCentroCosto'`
+5. Backend ejecuta SP de eliminación
+6. Retorna `{ Id: estado, Name: mensaje }`
+7. Se refresca la grilla con `Grilla_ClieCentroCosto(1)`
+
+---
+
+### **CLONE (Clonar)**
+
+**Flujo:**
+1. Usuario hace clic en botón "Clonar" ? `Accion_ClieCentroCosto(id, 2, id)`
+2. Se ejecuta `popform_ClieCentroCosto()` con `accion=2`
+3. Se cargan los datos del registro original (igual que edición)
+4. El campo `IdClieCentroCosto` se resetea a `""` (nuevo registro)
+5. Usuario puede modificar antes de grabar
+6. Al grabar, se trata como INSERT (accion=0 internamente)
+
+---
+
+### **VIEW (Ver - Solo lectura)**
+
+**Flujo:**
+1. Usuario hace clic en botón "Ver" ? `Accion_ClieCentroCosto(id, 4, id)`
+2. Ejecuta `SubFormJquery(id, 'form_ClieCentroCosto.aspx?id={id}&tabla=ClieCentroCosto', ...)`
+3. Abre un iframe modal con el formulario en modo solo lectura
+4. El control `Ctrl_ClieCentroCosto.ascx.cs` detecta querystring y ejecuta `SoloLectura()`:
+   - Deshabilita todos los campos
+   - Oculta botones de acción
+
+---
+
+## Detalles técnicos adicionales
+
+### Estructura de datos (clase C#)
+
+```csharp
+public class ClieCentroCosto
+{
+    public Int32 ws_IdClieCentroCosto { get; set; }
+    public string ws_IdClieCliente { get; set; }
+    public string ws_Nombre { get; set; }
+    public string ws_Botones { get; set; }
+}
+```
+
+### Configuración de grilla (jqGrid)
+
+- **Columnas visibles:**
+  - `IdClieCentroCosto` (10% ancho)
+  - `Nombre` (75% ancho)
+  - `Botones` (180px, no ordenable)
+
+- **Paginación:**
+  - Filas por página: calculadas dinámicamente `(altura_ventana - 200) / 23`
+  - Opciones: [calculado, 50, 100]
+
+- **Exportación:**
+  - Botones para exportar a Excel (`.xls`) y CSV (`.csv`)
+  - Usa función `ExportGrilla()`
+
+### Seguridad
+
+- **Autenticación:** Verificada en `Page_Load` (`HttpContext.Current.User.Identity.IsAuthenticated`)
+- **Autorización:** `Autentificacion.ValidaPerfil(usuario, "ClieCentroCosto")`
+- **Log de accesos:** `ClassSigav.GrabaLogAccesos()` registra cada acceso a la grilla
+- **Log de eventos:** `Registrar_LogEvento()` registra apertura/cierre de formulario
+
+### Gestión de estado
+
+- **Session["IdUser"]:** ID del usuario autenticado
+- **Session["idpadre"]:** Se resetea a `""` en `Page_Load`
+- **#mod_ClieCentroCosto:** Campo oculto que detecta cambios en el formulario
+
+---
+
+## Problemas potenciales identificados
+
+1. **Inyección SQL:**  
+   - El code-behind usa concatenación de strings en `CommandText`
+   - Ejemplo: `comm.CommandText = "sp_InicializaClieCentroCosto '" + idUsuario + "'"`
+   - **Recomendación:** Usar `SqlParameter`
+
+2. **Manejo de errores:**  
+   - Los bloques `try/catch` están vacíos o retornan estructuras vacías
+   - No hay logging de excepciones
+
+3. **Validación:**  
+   - Solo del lado del cliente (JavaScript)
+   - No hay validación en el backend antes de ejecutar SP
+
+4. **Performance:**  
+   - Tres llamadas AJAX separadas para cargar filtros en `Caption()`
+   - Se podría consolidar en una sola llamada
+
+---
+
+## Conclusiones
+
+Este componente sigue un **patrón estándar de la aplicación** para módulos CRUD:
+- Grilla jqGrid con paginación del lado del servidor
+- Formulario modal jQuery UI
+- WebMethods para comunicación AJAX
+- Stored procedures para acceso a datos
+- Centralización de operaciones de grabación/eliminación en `servicios_sigav.aspx`
+
+El diseño es coherente pero presenta **oportunidades de mejora** en seguridad (SQL injection), manejo de errores y validación del lado del servidor.
