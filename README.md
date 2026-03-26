@@ -55,6 +55,9 @@
 
 ### Análisis de Componentes - Módulo Proveedores
 - [grid_ProvProveedores.md](Maestros/Proveedores/grid_ProvProveedores.md) - Mantenimiento de Proveedores
+- [grid_ProvHolding.md](Maestros/Proveedores/grid_ProvHolding.md) - Mantenimiento de Holdings de Proveedores
+- [grid_ProvTipoProveedores.md](Maestros/Proveedores/grid_ProvTipoProveedores.md) - Mantenimiento de Tipos de Proveedores
+- [grid_ProvTipoAjuste.md](Maestros/Proveedores/grid_ProvTipoAjuste.md) - Mantenimiento de Tipos de Ajuste
 
 ### Documentación Transversal
 - [Relaciones_Entidades.md](Relaciones_Entidades.md) - Catálogo centralizado de relaciones entre entidades

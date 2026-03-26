@@ -66,6 +66,24 @@ Este documento centraliza todas las relaciones de clave foránea detectadas en e
 
 ## Módulo Proveedores
 
+### ProvHolding a MaeEmpresa
+
+- **Campo**: `IdMaeEmpresa` (obligatorio)
+- **Tipo de relación**: Many-to-One (muchos holdings por empresa)
+- **Propósito**: asocia holdings de proveedores a empresas del sistema para estructuras empresariales complejas
+
+### ProvTipoProveedores a MaeEmpresa
+
+- **Campo**: `IdMaeEmpresa` (obligatorio)
+- **Tipo de relación**: Many-to-One (muchos tipos de proveedores por empresa)
+- **Propósito**: asocia tipos de proveedores a empresas del sistema, permitiendo diferentes clasificaciones por empresa
+
+### ProvTipoAjuste (sin relaciones con MaeEmpresa)
+
+- **Característica**: Catálogo global del sistema sin segmentación por empresa
+- **Propósito**: clasifica tipos de ajustes aplicables a proveedores de manera uniforme en todo el sistema
+- **Nota**: A diferencia de ProvHolding y ProvTipoProveedores, ProvTipoAjuste es un catálogo transversal sin FK a MaeEmpresa
+
 ### ProvProveedores a ProvTipoProveedor
 
 - **Campo**: `IdProvTipoProveedor` (opcional)
@@ -167,10 +185,29 @@ erDiagram
 
 ```mermaid
 erDiagram
+    ProvHolding }o--|| MaeEmpresa : "pertenece"
+    ProvTipoProveedores }o--|| MaeEmpresa : "pertenece"
     ProvProveedores }o--o| ProvTipoProveedor : "es tipo"
     ProvProveedores }o--o| ProvHolding : "pertenece"
     ProvProveedores }o--o| MaeSucursal : "asociado"
     ProvProveedores }o--o| ProvEstado : "tiene estado"
+
+    ProvHolding {
+        int IdProvHolding PK
+        int IdMaeEmpresa FK "Obligatorio"
+        varchar Nombre
+    }
+
+    ProvTipoProveedores {
+        int IdProvTipoProveedores PK
+        int IdMaeEmpresa FK "Obligatorio"
+        varchar Nombre
+    }
+
+    ProvTipoAjuste {
+        int IdProvTipoAjuste PK
+        varchar Nombre UK "Catálogo Global - Sin FK a Empresa"
+    }
 
     ProvProveedores {
         int IdProvProveedores PK
@@ -188,11 +225,6 @@ erDiagram
         varchar Nombre
     }
 
-    ProvHolding {
-        int IdProvHolding PK
-        varchar Nombre
-    }
-
     ProvEstado {
         int IdProvEstado PK
         varchar Nombre
@@ -201,6 +233,12 @@ erDiagram
     MaeSucursal {
         int IdMaeSucursal PK
         varchar Nombre
+    }
+
+    MaeEmpresa {
+        int IdMaeEmpresa PK
+        varchar Nombre
+        varchar Nombre2
     }
 ```
 
